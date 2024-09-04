@@ -20,10 +20,10 @@ app.use(
   })
 );
 
-//express.static le chai static file lai serve garxa
+//express.static le chai static file lai serve garxa. public assest haru lai user garxa
 app.use(express.static("public"));
 
-//it allows the server to automatically parse cookies sent by the client in the Cookie header of the request.
+//it allows the server to automatically parse cookies sent by the client in the Cookie header of the request. server le user ko browser lai access garera crud operation haru garna sakinxa .
 app.use(cookieParser());
 
 export { app };
