@@ -26,4 +26,10 @@ app.use(express.static("public"));
 //it allows the server to automatically parse cookies sent by the client in the Cookie header of the request. server le user ko browser lai access garera crud operation haru garna sakinxa .
 app.use(cookieParser());
 
+
+//import router in this file yo import chai middleware hisab le huxna so app.use() yo method nai call garney 
+import userRouter from "./routes/user.routes.js";
+app.use("/api/v1/users",userRouter);
+//http://localhost:8000/api/v1/users/register
+
 export { app };
