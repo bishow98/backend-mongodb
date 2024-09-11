@@ -13,18 +13,19 @@ const uploadInCloudinary = async (localFilePath) => {
   try {
     if (!localFilePath) return null;
 
-
     //upload the file in cloudinary
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
     });
 
-
     // file has been uploaded
     console.log("file has been uploaded ", response.url);
+    console.log(`Height: ${response.height} width: ${response.width}`);
+    console.log(`Format: ${response.format} and displayname: ${response.original_filename}`);
+    console.log(response);
+    fs.unlinkSync(localFilePath); // file lai local path bata unlink matlab delete gardinxa aba file upload garda 
 
     return response;
-    
   } catch (error) {
     //remove the locally saved temporary file as the upload operation got failed
     fs.unlinkSync(localFilePath);

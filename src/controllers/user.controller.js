@@ -17,7 +17,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   //get user details from frontend or postman thunderclient
   const { username, email, fullname, password } = req.body;
-  console.log("username", username);
+  console.log(req.body);
 
   //validation check garxa below code le : here only empty filed check gariraxum
   if (
@@ -27,17 +27,30 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   //Check if user already exist : username, email check garney : yo check garna lai chai model bata User import gareko xa ra findOne mongoDb ko query chalako xa
-  const existedUser = User.findOne({
+  const existedUser = await User.findOne({
     $or: [{ username }, { email }],
   });
+  console.log(existedUser);
 
   if (existedUser) {
     throw new ApiError(409, "This email or username is already registered");
   }
 
   //check for images : yesko lagi chai user.routes.js ma middleware multer user gareko xa ra tyaha kehi property haru check gareko xum jastai avatar ra coverImage using .fields methods bata array of object banako xa avatar ra coverImage kai lagi
+  console.log(req.files);
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  //const coverImageLocalPath = req.files?.coverImage[0]?.path;  //yo code ma chai k error hunxa vaney req.files le chai coverImage expect garxa ra yedi tyo vetayena vaney ta undefined vayo ra API testing garda tyaha error aauney vayo to resolve this
+
+
+  //safe side vayo yo chai .. traditional tarika le check garim hami ley coverImageLocalPath ko lagi chai using Array.isArray() method 
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
 
   //check for avatar : if not found then throw custom ApiError with avatar image is required
   if (!avatarLocalPath) {
@@ -54,7 +67,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   //create user object and entry in database with certain condion of following
-  const user = User.create({
+  const user = await User.create({
     fullname,
     avatar: avatar.url, //yo field ta hami le compulsory le check garekai xa so yo aauxa nai aauxa
     email,
@@ -62,6 +75,7 @@ const registerUser = asyncHandler(async (req, res) => {
     username: username.toLowerCase(), // username lai lowercase mai rakhney
     password,
   });
+  console.log(user);
 
   //remove password and refreshToken field from response
   const createdUser = await User.findById(user._id).select(
