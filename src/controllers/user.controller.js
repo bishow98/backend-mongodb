@@ -270,4 +270,31 @@ const refreshAccessToken = asyncHandler(async (req, res)=>{
 
 })
 
-export { registerUser, loginUser,logoutUser, refreshAccessToken };
+
+const changeCurrentPassword = asyncHandler(async(req,res)=>{
+  //req.body bata oldPassword ra newPassword liney ho 
+  const {oldPassword,newPassword} = req.body
+
+  //password change gardai xum vaney ta user already logged in nai huney vayo so req.user middleware ma hami le user vanera set gareko xum ra yo database sanga liney 
+  const loggedUser = await User.findById(req.user?._id)
+
+
+  //yaha chai loggedUser ko password match gareko usermodel ma vako isPasswordCorrect vanney method bata ra oldpassword as an argument pass garako xa 
+  const oldPasswordCorrect = await loggedUser.isPasswordCorrect(oldPassword)
+  if(!oldPasswordCorrect){
+    throw new ApiError(400, "Old password is incorrect")
+  }
+
+  //set the newPassword into password field of database and save it without validation . yesle chai k garyo vaney user schema bata pre hooks chalaidiyo mongodb ko ra just before save password pani hash huney vayo yo case ma 
+  loggedUser.password = newPassword;
+  await loggedUser.save({validateBeforeSave: false})
+
+
+  return res
+  .status(200)
+  .json(new ApiResponse(200, {}, "Password changed successfully "))
+
+})
+
+
+export { registerUser, loginUser,logoutUser, refreshAccessToken, changeCurrentPassword};
