@@ -181,120 +181,234 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
-const logoutUser = asyncHandler(async (req, res)=>{
-  // middle ware banayim authentication ko lagi ra naya object add garim user vanera aba user sanga access xa id ko ra dbquery garera set operation user gareko xum 
+const logoutUser = asyncHandler(async (req, res) => {
+  // middle ware banayim authentication ko lagi ra naya object add garim user vanera aba user sanga access xa id ko ra dbquery garera set operation user gareko xum
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set:{
-        refreshToken: undefined
-      }
+      $set: {
+        refreshToken: undefined,
+      },
     },
     {
-      new: true
+      new: true,
     }
-  )
+  );
 
   const options = {
     httpOnly: true,
     secure: true,
-  }
+  };
 
   return res
-  .status(200)
-  .clearCookie("accessToken", options)
-  .clearCookie("refreshToken",options)
-  .json(
-    new ApiResponse(200,{},"User logged Out Successfully!")
-  )
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged Out Successfully!"));
+});
 
-})
-
-const refreshAccessToken = asyncHandler(async (req, res)=>{
-
-  //front end bata aairaheko refresh token lai ki ta cookies bata liney wa body bata aairaheko request lai store garney variable ma 
-  const incommingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
-
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  //front end bata aairaheko refresh token lai ki ta cookies bata liney wa body bata aairaheko request lai store garney variable ma
+  const incommingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
 
   //yedi tyo incommingrefresh xaina vaney yo garney
-  if(!incommingRefreshToken){
-    throw new ApiError(401,"unauthorized request");
+  if (!incommingRefreshToken) {
+    throw new ApiError(401, "unauthorized request");
   }
 
   try {
-    //aba chai tyo incomming refresh token chai verified xa ki xaina teslai decode garney. with jwt.verify(aairahekoreq, refreshtokensecret ) yeti user garera 
+    //aba chai tyo incomming refresh token chai verified xa ki xaina teslai decode garney. with jwt.verify(aairahekoreq, refreshtokensecret ) yeti user garera
     const decodedToken = jwt.verify(
       incommingRefreshToken,
       process.env.REFRESH_TOKEN_SECRET
-    )
-  
-    //aba dabasase sanga query garney tyo decodedToken ko id find garney ra user ma rakhdiney 
-    const user = await User.findById(decodedToken?._id)
-  
-  
-    //aba yedi tyo id vako user nai xaina vaney invalid token diney 
-    if(!user){
-      throw new ApiError(401, "Invalid refresh Token")
+    );
+
+    //aba dabasase sanga query garney tyo decodedToken ko id find garney ra user ma rakhdiney
+    const user = await User.findById(decodedToken?._id);
+
+    //aba yedi tyo id vako user nai xaina vaney invalid token diney
+    if (!user) {
+      throw new ApiError(401, "Invalid refresh Token");
     }
-  
-  
+
     //aba chai compare garney yedi tyo incomming refreshToken ra databasema vako refreshToken match garena vaney error throw garney
-    if(incommingRefreshToken!== user?._refreshToken){
-      throw new ApiError(401, "Refresh Token is expired or used")
+    if (incommingRefreshToken !== user?._refreshToken) {
+      throw new ApiError(401, "Refresh Token is expired or used");
     }
-  
-  //match garyo vaney aba accessToken ra refreshToken generate gardiney yo method bata jun chai aagadi nai banako xum hami le 
-   const {accessToken,newrefreshToken} =  await generateAccessAndRefreshTokens(user._id);
-  
-   //cookie ko lagi secure channel set garney
+
+    //match garyo vaney aba accessToken ra refreshToken generate gardiney yo method bata jun chai aagadi nai banako xum hami le
+    const { accessToken, newrefreshToken } =
+      await generateAccessAndRefreshTokens(user._id);
+
+    //cookie ko lagi secure channel set garney
     const options = {
       httpOnly: true,
       secure: true,
-    }
-  
-    res.status(200)
-    .cookie("accessToken",accessToken,options)
-    .cookie("refreshToken",newrefreshToken,options)
-    .json(
-      new ApiResponse(
-        200,
-        {accessToken, refreshToken: newrefreshToken},
-        "Access token is refreshed"
-  
-      )
-    )
+    };
+
+    res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", newrefreshToken, options)
+      .json(
+        new ApiResponse(
+          200,
+          { accessToken, refreshToken: newrefreshToken },
+          "Access token is refreshed"
+        )
+      );
   } catch (error) {
-    throw new ApiError(401,error?.message|| "Invalid refresh token")
+    throw new ApiError(401, error?.message || "Invalid refresh token");
+  }
+});
+
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  //req.body bata oldPassword ra newPassword liney ho
+  const { oldPassword, newPassword } = req.body;
+
+  //password change gardai xum vaney ta user already logged in nai huney vayo so req.user middleware ma hami le user vanera set gareko xum ra yo database sanga liney
+  const loggedUser = await User.findById(req.user?._id);
+
+  //yaha chai loggedUser ko password match gareko usermodel ma vako isPasswordCorrect vanney method bata ra oldpassword as an argument pass garako xa
+  const oldPasswordCorrect = await loggedUser.isPasswordCorrect(oldPassword);
+  if (!oldPasswordCorrect) {
+    throw new ApiError(400, "Old password is incorrect");
   }
 
-
-})
-
-
-const changeCurrentPassword = asyncHandler(async(req,res)=>{
-  //req.body bata oldPassword ra newPassword liney ho 
-  const {oldPassword,newPassword} = req.body
-
-  //password change gardai xum vaney ta user already logged in nai huney vayo so req.user middleware ma hami le user vanera set gareko xum ra yo database sanga liney 
-  const loggedUser = await User.findById(req.user?._id)
-
-
-  //yaha chai loggedUser ko password match gareko usermodel ma vako isPasswordCorrect vanney method bata ra oldpassword as an argument pass garako xa 
-  const oldPasswordCorrect = await loggedUser.isPasswordCorrect(oldPassword)
-  if(!oldPasswordCorrect){
-    throw new ApiError(400, "Old password is incorrect")
-  }
-
-  //set the newPassword into password field of database and save it without validation . yesle chai k garyo vaney user schema bata pre hooks chalaidiyo mongodb ko ra just before save password pani hash huney vayo yo case ma 
+  //set the newPassword into password field of database and save it without validation . yesle chai k garyo vaney user schema bata pre hooks chalaidiyo mongodb ko ra just before save password pani hash huney vayo yo case ma
   loggedUser.password = newPassword;
-  await loggedUser.save({validateBeforeSave: false})
-
+  await loggedUser.save({ validateBeforeSave: false });
 
   return res
-  .status(200)
-  .json(new ApiResponse(200, {}, "Password changed successfully "))
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully "));
+});
 
+const getCurrentUser = asyncHandler(async (req, res) => {
+  //current user lai line ko lagi ta req.user vanney middleware bata lida hunxa  kina vaney yedi user logged in xa vaney ta req.user lai hami le set gareko xum
+  //direct return garda vayo res lai with the help of req.user as a data in json
+
+  return res
+    .status(200)
+    .json(200, req.user, "current user fetched successfully");
+});
+
+const updateAccountDetails = asyncHandler(async (req, res) =>{
+  //req.body bata data liney kun kun field lai update garauney vanera 
+  const {fullname, email} = req.body
+
+  //check if there is no fullname and email then 
+  if(!fullname || !email){
+    throw new ApiError(400, "Please provide at least one field to update")
+  }
+
+  //now from mongodb check the user id and update the required field 
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set:{
+        fullname: fullname,
+        email: email
+      }
+  },
+  {new:true}
+).select("-password")
+
+return res
+.status(200)
+.json(
+ new ApiResponse(200,{user},"Updated fullname and email || account details updates successfully ")
+)
+  
+})
+
+const updateUserAvatar = asyncHandler(async (req, res) =>{
+ //aba yaha ta file upload garnu parney hunxa so : yaha ko case ma hami only avatar update gardai xum so file is needed : req.file?.path 
+
+ const avatarLocalPath = req.file?.path 
+
+ if(!avatarLocalPath){
+  throw new ApiError(400, "give correct avatar file")
+ }
+
+ const avatar = await uploadInCloudinary(avatarLocalPath)
+
+ if(!avatar.url){
+  throw new ApiError(400, "Error while uploading an avatar")
+ }
+
+ const user = await User.findByIdAndUpdate(
+  req.user?._id,
+  {
+    $set:{
+      avatar: avatar.url
+    }
+
+  },
+  {
+    new : true
+  }
+).select("-password")
+
+return res
+.status(200)
+.json(
+  new ApiResponse(200,user,"avatar updated successfully")
+)
 })
 
 
-export { registerUser, loginUser,logoutUser, refreshAccessToken, changeCurrentPassword};
+const updateUsercoverImage = asyncHandler(async (req, res) =>{
+  //aba yaha ta file upload garnu parney hunxa so : yaha ko case ma hami only coverImage update gardai xum so file is needed : req.file?.path 
+ 
+  const coverImageLocalPath = req.file?.path 
+ 
+  if(!coverImageLocalPath){
+   throw new ApiError(400, "give correct coverImage file path")
+  }
+  
+  //cloudinary ma upload garayo yo method le uploadInCloudinary which is already created inside utils with file name cloudinary.fileuploads.js
+  const coverImage = await uploadInCloudinary(coverImageLocalPath)
+ 
+  if(!coverImage.url){
+   throw new ApiError(400, "Error while uploading a coverImage")
+  }
+ 
+
+  //database ma query garera update gardiney aba ko nay coverImage ko url from cloudinary service bata 
+  const user = await User.findByIdAndUpdate(
+   req.user?._id,
+   {
+     $set:{
+       coverImage: coverImage.url
+     }
+ 
+   },
+   {
+     new : true
+   }
+ ).select("-password")
+
+ return res
+ .status(200)
+ .json(
+  new ApiResponse(200,user,"coverImage updated successfully")
+ )
+ 
+ })
+
+
+
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateAccountDetails,
+  updateUserAvatar,
+  updateUsercoverImage
+};
