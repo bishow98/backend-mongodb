@@ -351,6 +351,8 @@ const updateUserAvatar = asyncHandler(async (req, res) =>{
   }
 ).select("-password")
 
+//TODO: old avatar image lai chai sabai kaam sake paxi delete garda vayo by finding the old url and deleting it from cloudinary 
+
 return res
 .status(200)
 .json(
@@ -399,6 +401,136 @@ const updateUsercoverImage = asyncHandler(async (req, res) =>{
  })
 
 
+ const getUserChannelProfile = asyncHandler(async (req, res)=>{
+  //hami lai yedi kunai user ko username nikalnu xa vaney user ko profile bata url liney ra tes bata chai username nikalney 
+  const {username} = req.params
+
+  if(!username?.trim()){
+    throw new ApiError(400, "username is missing")
+  }
+
+  //aba database ma find method garera username nikalney ani pheri _id bata aggregation pipeline linu vanda ramro . aggregate use garney ra multiple pipeline create garney find ko lagi . $match user garda hunxa ra yo aggregation le array return garxa 
+  const channel = await User.aggregate([
+    {
+      $match:{
+        username:username.tolowerCase()
+      }
+    },
+    {
+      $lookup:{//lookup performs left outer join of the related documents and returns the array
+        from:subscriptions,
+        localField:"_id",
+        foreignField:"channel",  //channel select garyo vaney subscribers lina sakinxa 
+        as:"subscribers"
+      }
+    },
+    {
+      $lookup:{
+        from:"subscriptions",//mongodb le small letter and plural form ma convert garxa .. uta model chai Subscription xa yeslai hami le aafai subscriptions vanera banaidiney 
+        localField:"_id",
+        foreignField:"subscriber",
+        as:"subscribedTo"
+      }
+    },
+    {
+      $addFields:{//The addFields operator is used to add new fields to documents within the aggregation pipeline.
+        subscribersCount:{
+          $size: "$subscribers"
+        },
+        channelSubscribedToCount:{
+          $size: "$subscribedTo"
+        },
+        isSubscribed:{
+          $cond:{
+            if:{$in: [req.user?._id, "$subscribers.subscriber"]},
+            then: true,
+            else: false
+          }
+        }
+      }
+    },
+    {
+      $project:{
+        fullname:1,
+        username:1,
+        subscribersCount:1,
+        channelSubscribedToCount:1,
+        isSubscribed: 1,
+        email,
+        avatar,
+        coverImage,
+      }
+    }
+  ])
+
+  console.log(channel);
+
+  if(!channel?.length){
+    throw new ApiError(404,"Channel does not exist")
+  }
+
+  return res
+  .status(200)
+  .json(
+    new ApiResponse(200,channel[0],"user channel fetched successfully")
+  )
+ })
+
+
+ const getWatchHistory = asyncHandler(async (req, res)=>{
+    //it is done with the help of mongodb operation . 'req.user._id' behind the scene yesle chai string dinxa database bata mongoose le object id lai convert garera id dinxa 
+    const user = await User.aggregate([
+      {
+        $match:{
+          _id: new mongoose.Types.ObjectId(req.user._id)
+        }
+      },
+      {
+        $lookup:{
+          from: "videos",
+          localField: "watchHistory",
+          foreignField: "_id",
+          as: "watchHistory",
+          pipeline:[
+            {
+              $lookup:{
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline:[
+                  {
+                    $project:{
+                      fullname:1,
+                      username:1,
+                      avatar:1                 
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              $addFields:{
+                owner:{
+                  $first: "$owner"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ])
+
+    return res
+    .status(200)
+    .json(
+      new ApiResponse(200,user[0].watchHistory,"Watch History fetched successfully")
+    )
+ })
+
+
+
+
 
 
 export {
@@ -410,5 +542,7 @@ export {
   getCurrentUser,
   updateAccountDetails,
   updateUserAvatar,
-  updateUsercoverImage
+  updateUsercoverImage,
+  getUserChannelProfile,
+  getWatchHistory
 };
