@@ -226,14 +226,18 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
     //aba dabasase sanga query garney tyo decodedToken ko id find garney ra user ma rakhdiney
     const user = await User.findById(decodedToken?._id);
+    // console.log(user); user ma chai k k hunxa vanera check gareko hami le 
 
     //aba yedi tyo id vako user nai xaina vaney invalid token diney
     if (!user) {
       throw new ApiError(401, "Invalid refresh Token");
     }
 
+    // console.log(`your incomming refresh token is : ${incommingRefreshToken}`); //check gareko error aako thiyo ani 
+    // console.log(`Your user refreshToken is : ${user?.refreshToken}`);
+
     //aba chai compare garney yedi tyo incomming refreshToken ra databasema vako refreshToken match garena vaney error throw garney
-    if (incommingRefreshToken !== user?._refreshToken) {
+    if (!(incommingRefreshToken === user?.refreshToken)) {
       throw new ApiError(401, "Refresh Token is expired or used");
     }
 
@@ -294,244 +298,237 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     .json(200, req.user, "current user fetched successfully");
 });
 
-const updateAccountDetails = asyncHandler(async (req, res) =>{
-  //req.body bata data liney kun kun field lai update garauney vanera 
-  const {fullname, email} = req.body
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  //req.body bata data liney kun kun field lai update garauney vanera
+  const { fullname, email } = req.body;
 
-  //check if there is no fullname and email then 
-  if(!fullname || !email){
-    throw new ApiError(400, "Please provide at least one field to update")
+  //check if there is no fullname and email then
+  if (!fullname || !email) {
+    throw new ApiError(400, "Please provide at least one field to update");
   }
 
-  //now from mongodb check the user id and update the required field 
+  //now from mongodb check the user id and update the required field
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
-      $set:{
+      $set: {
         fullname: fullname,
-        email: email
-      }
-  },
-  {new:true}
-).select("-password")
+        email: email,
+      },
+    },
+    { new: true }
+  ).select("-password");
 
-return res
-.status(200)
-.json(
- new ApiResponse(200,{user},"Updated fullname and email || account details updates successfully ")
-)
-  
-})
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { user },
+        "Updated fullname and email || account details updates successfully "
+      )
+    );
+});
 
-const updateUserAvatar = asyncHandler(async (req, res) =>{
- //aba yaha ta file upload garnu parney hunxa so : yaha ko case ma hami only avatar update gardai xum so file is needed : req.file?.path 
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  //aba yaha ta file upload garnu parney hunxa so : yaha ko case ma hami only avatar update gardai xum so file is needed : req.file?.path
 
- const avatarLocalPath = req.file?.path 
+  const avatarLocalPath = req.file?.path;
 
- if(!avatarLocalPath){
-  throw new ApiError(400, "give correct avatar file")
- }
-
- const avatar = await uploadInCloudinary(avatarLocalPath)
-
- if(!avatar.url){
-  throw new ApiError(400, "Error while uploading an avatar")
- }
-
- const user = await User.findByIdAndUpdate(
-  req.user?._id,
-  {
-    $set:{
-      avatar: avatar.url
-    }
-
-  },
-  {
-    new : true
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "give correct avatar file");
   }
-).select("-password")
 
-//TODO: old avatar image lai chai sabai kaam sake paxi delete garda vayo by finding the old url and deleting it from cloudinary 
+  const avatar = await uploadInCloudinary(avatarLocalPath);
 
-return res
-.status(200)
-.json(
-  new ApiResponse(200,user,"avatar updated successfully")
-)
-})
-
-
-const updateUsercoverImage = asyncHandler(async (req, res) =>{
-  //aba yaha ta file upload garnu parney hunxa so : yaha ko case ma hami only coverImage update gardai xum so file is needed : req.file?.path 
- 
-  const coverImageLocalPath = req.file?.path 
- 
-  if(!coverImageLocalPath){
-   throw new ApiError(400, "give correct coverImage file path")
+  if (!avatar.url) {
+    throw new ApiError(400, "Error while uploading an avatar");
   }
-  
-  //cloudinary ma upload garayo yo method le uploadInCloudinary which is already created inside utils with file name cloudinary.fileuploads.js
-  const coverImage = await uploadInCloudinary(coverImageLocalPath)
- 
-  if(!coverImage.url){
-   throw new ApiError(400, "Error while uploading a coverImage")
-  }
- 
 
-  //database ma query garera update gardiney aba ko nay coverImage ko url from cloudinary service bata 
   const user = await User.findByIdAndUpdate(
-   req.user?._id,
-   {
-     $set:{
-       coverImage: coverImage.url
-     }
- 
-   },
-   {
-     new : true
-   }
- ).select("-password")
+    req.user?._id,
+    {
+      $set: {
+        avatar: avatar.url,
+      },
+    },
+    {
+      new: true,
+    }
+  ).select("-password");
 
- return res
- .status(200)
- .json(
-  new ApiResponse(200,user,"coverImage updated successfully")
- )
- 
- })
+  //TODO: old avatar image lai chai sabai kaam sake paxi delete garda vayo by finding the old url and deleting it from cloudinary
 
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "avatar updated successfully"));
+});
 
- const getUserChannelProfile = asyncHandler(async (req, res)=>{
-  //hami lai yedi kunai user ko username nikalnu xa vaney user ko profile bata url liney ra tes bata chai username nikalney 
-  const {username} = req.params
+const updateUsercoverImage = asyncHandler(async (req, res) => {
+  //aba yaha ta file upload garnu parney hunxa so : yaha ko case ma hami only coverImage update gardai xum so file is needed : req.file?.path
 
-  if(!username?.trim()){
-    throw new ApiError(400, "username is missing")
+  const coverImageLocalPath = req.file?.path;
+
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "give correct coverImage file path");
   }
 
-  //aba database ma find method garera username nikalney ani pheri _id bata aggregation pipeline linu vanda ramro . aggregate use garney ra multiple pipeline create garney find ko lagi . $match user garda hunxa ra yo aggregation le array return garxa 
+  //cloudinary ma upload garayo yo method le uploadInCloudinary which is already created inside utils with file name cloudinary.fileuploads.js
+  const coverImage = await uploadInCloudinary(coverImageLocalPath);
+
+  if (!coverImage.url) {
+    throw new ApiError(400, "Error while uploading a coverImage");
+  }
+
+  //database ma query garera update gardiney aba ko nay coverImage ko url from cloudinary service bata
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        coverImage: coverImage.url,
+      },
+    },
+    {
+      new: true,
+    }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "coverImage updated successfully"));
+});
+
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  //hami lai yedi kunai user ko username nikalnu xa vaney user ko profile bata url liney ra tes bata chai username nikalney
+  const { username } = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(400, "username is missing");
+  }
+
+  //aba database ma find method garera username nikalney ani pheri _id bata aggregation pipeline linu vanda ramro . aggregate use garney ra multiple pipeline create garney find ko lagi . $match user garda hunxa ra yo aggregation le array return garxa
   const channel = await User.aggregate([
     {
-      $match:{
-        username:username.tolowerCase()
-      }
+      $match: {
+        username: username.tolowerCase(),
+      },
     },
     {
-      $lookup:{//lookup performs left outer join of the related documents and returns the array
-        from:subscriptions,
-        localField:"_id",
-        foreignField:"channel",  //channel select garyo vaney subscribers lina sakinxa 
-        as:"subscribers"
-      }
+      $lookup: {
+        //lookup performs left outer join of the related documents and returns the array
+        from: subscriptions,
+        localField: "_id",
+        foreignField: "channel", //channel select garyo vaney subscribers lina sakinxa
+        as: "subscribers",
+      },
     },
     {
-      $lookup:{
-        from:"subscriptions",//mongodb le small letter and plural form ma convert garxa .. uta model chai Subscription xa yeslai hami le aafai subscriptions vanera banaidiney 
-        localField:"_id",
-        foreignField:"subscriber",
-        as:"subscribedTo"
-      }
+      $lookup: {
+        from: "subscriptions", //mongodb le small letter and plural form ma convert garxa .. uta model chai Subscription xa yeslai hami le aafai subscriptions vanera banaidiney
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
     },
     {
-      $addFields:{//The addFields operator is used to add new fields to documents within the aggregation pipeline.
-        subscribersCount:{
-          $size: "$subscribers"
+      $addFields: {
+        //The addFields operator is used to add new fields to documents within the aggregation pipeline.
+        subscribersCount: {
+          $size: "$subscribers",
         },
-        channelSubscribedToCount:{
-          $size: "$subscribedTo"
+        channelSubscribedToCount: {
+          $size: "$subscribedTo",
         },
-        isSubscribed:{
-          $cond:{
-            if:{$in: [req.user?._id, "$subscribers.subscriber"]},
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
             then: true,
-            else: false
-          }
-        }
-      }
+            else: false,
+          },
+        },
+      },
     },
     {
-      $project:{
-        fullname:1,
-        username:1,
-        subscribersCount:1,
-        channelSubscribedToCount:1,
+      $project: {
+        fullname: 1,
+        username: 1,
+        subscribersCount: 1,
+        channelSubscribedToCount: 1,
         isSubscribed: 1,
         email,
         avatar,
         coverImage,
-      }
-    }
-  ])
+      },
+    },
+  ]);
 
   console.log(channel);
 
-  if(!channel?.length){
-    throw new ApiError(404,"Channel does not exist")
+  if (!channel?.length) {
+    throw new ApiError(404, "Channel does not exist");
   }
 
   return res
-  .status(200)
-  .json(
-    new ApiResponse(200,channel[0],"user channel fetched successfully")
-  )
- })
-
-
- const getWatchHistory = asyncHandler(async (req, res)=>{
-    //it is done with the help of mongodb operation . 'req.user._id' behind the scene yesle chai string dinxa database bata mongoose le object id lai convert garera id dinxa 
-    const user = await User.aggregate([
-      {
-        $match:{
-          _id: new mongoose.Types.ObjectId(req.user._id)
-        }
-      },
-      {
-        $lookup:{
-          from: "videos",
-          localField: "watchHistory",
-          foreignField: "_id",
-          as: "watchHistory",
-          pipeline:[
-            {
-              $lookup:{
-                from: "users",
-                localField: "owner",
-                foreignField: "_id",
-                as: "owner",
-                pipeline:[
-                  {
-                    $project:{
-                      fullname:1,
-                      username:1,
-                      avatar:1                 
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              $addFields:{
-                owner:{
-                  $first: "$owner"
-                }
-              }
-            }
-          ]
-        }
-      }
-    ])
-
-    return res
     .status(200)
     .json(
-      new ApiResponse(200,user[0].watchHistory,"Watch History fetched successfully")
-    )
- })
+      new ApiResponse(200, channel[0], "user channel fetched successfully")
+    );
+});
 
+const getWatchHistory = asyncHandler(async (req, res) => {
+  //it is done with the help of mongodb operation . 'req.user._id' behind the scene yesle chai string dinxa database bata mongoose le object id lai convert garera id dinxa
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
 
-
-
-
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch History fetched successfully"
+      )
+    );
+});
 
 export {
   registerUser,
@@ -544,5 +541,5 @@ export {
   updateUserAvatar,
   updateUsercoverImage,
   getUserChannelProfile,
-  getWatchHistory
+  getWatchHistory,
 };
