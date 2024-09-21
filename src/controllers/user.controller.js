@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadInCloudinary } from "../utils/cloudinary.fileuploads.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 //refresh and access token generation method
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -58,6 +59,7 @@ const registerUser = asyncHandler(async (req, res) => {
   //check for images : yesko lagi chai user.routes.js ma middleware multer user gareko xa ra tyaha kehi property haru check gareko xum jastai avatar ra coverImage using .fields methods bata array of object banako xa avatar ra coverImage kai lagi
   console.log(req.files);
   const avatarLocalPath = req.files?.avatar[0]?.path;
+  console.log(avatarLocalPath);
   //const coverImageLocalPath = req.files?.coverImage[0]?.path;  //yo code ma chai k error hunxa vaney req.files le chai coverImage expect garxa ra yedi tyo vetayena vaney ta undefined vayo ra API testing garda tyaha error aauney vayo to resolve this
 
   //safe side vayo yo chai .. traditional tarika le check garim hami ley coverImageLocalPath ko lagi chai using Array.isArray() method
@@ -186,8 +188,8 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1,
       },
     },
     {
@@ -226,14 +228,14 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
     //aba dabasase sanga query garney tyo decodedToken ko id find garney ra user ma rakhdiney
     const user = await User.findById(decodedToken?._id);
-    // console.log(user); user ma chai k k hunxa vanera check gareko hami le 
+    // console.log(user); user ma chai k k hunxa vanera check gareko hami le
 
     //aba yedi tyo id vako user nai xaina vaney invalid token diney
     if (!user) {
       throw new ApiError(401, "Invalid refresh Token");
     }
 
-    // console.log(`your incomming refresh token is : ${incommingRefreshToken}`); //check gareko error aako thiyo ani 
+    // console.log(`your incomming refresh token is : ${incommingRefreshToken}`); //check gareko error aako thiyo ani
     // console.log(`Your user refreshToken is : ${user?.refreshToken}`);
 
     //aba chai compare garney yedi tyo incomming refreshToken ra databasema vako refreshToken match garena vaney error throw garney
@@ -280,8 +282,11 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Old password is incorrect");
   }
 
+  // console.log(`you are going to change the oldPassword: ${oldPassword} with newPassword : ${newPassword}`)//yaha chai check gareko hai ta k kasto ho old password kasari aayo new password kasari save garney vanera
+
   //set the newPassword into password field of database and save it without validation . yesle chai k garyo vaney user schema bata pre hooks chalaidiyo mongodb ko ra just before save password pani hash huney vayo yo case ma
   loggedUser.password = newPassword;
+  console.log(`changed password is : ${loggedUser.password}`);
   await loggedUser.save({ validateBeforeSave: false });
 
   return res
@@ -301,9 +306,10 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 const updateAccountDetails = asyncHandler(async (req, res) => {
   //req.body bata data liney kun kun field lai update garauney vanera
   const { fullname, email } = req.body;
+  // console.log(fullname, email);for checking
 
   //check if there is no fullname and email then
-  if (!fullname || !email) {
+  if (!(fullname || email)) {
     throw new ApiError(400, "Please provide at least one field to update");
   }
 
@@ -325,7 +331,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         { user },
-        "Updated fullname and email || account details updates successfully "
+        "Updated fullname or email  or both || account details updates successfully "
       )
     );
 });
@@ -410,13 +416,13 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   const channel = await User.aggregate([
     {
       $match: {
-        username: username.tolowerCase(),
+        username: username.toLowerCase(),
       },
     },
     {
       $lookup: {
         //lookup performs left outer join of the related documents and returns the array
-        from: subscriptions,
+        from: "subscriptions",
         localField: "_id",
         foreignField: "channel", //channel select garyo vaney subscribers lina sakinxa
         as: "subscribers",
@@ -455,9 +461,9 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         subscribersCount: 1,
         channelSubscribedToCount: 1,
         isSubscribed: 1,
-        email,
-        avatar,
-        coverImage,
+        email:1,
+        avatar:1,
+        coverImage:1,
       },
     },
   ]);
