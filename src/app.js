@@ -27,9 +27,24 @@ app.use(express.static("public"));
 app.use(cookieParser());
 
 
+
+
+//routes import 
+import userRouter from "./routes/user.routes.js"; //user route lai import garyo yaha 
+import videoRouter from "./routes/video.routes.js";//video route lai import garyo yaha
+
+
+
+
+
 //import router in this file yo import chai middleware hisab le huxna so app.use() yo method nai call garney 
-import userRouter from "./routes/user.routes.js";
+//routes declaration 
 app.use("/api/v1/users",userRouter);
 //http://localhost:8000/api/v1/users/register
+
+app.use("/api/v1/videos", videoRouter);
+//http://localhost:8000/api/v1/videos
+
+
 
 export { app };
